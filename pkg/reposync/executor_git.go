@@ -62,15 +62,13 @@ func (e GitExecutor) Execute(ctx context.Context, plan Plan, opts RunOptions, si
 	}
 
 	go func() {
+		defer close(jobs)
 		for _, action := range plan.Actions {
-			select {
-			case <-ctx.Done():
-				break
-			default:
-				jobs <- action
+			if ctx.Err() != nil {
+				return
 			}
+			jobs <- action
 		}
-		close(jobs)
 	}()
 
 	var execResult ExecutionResult

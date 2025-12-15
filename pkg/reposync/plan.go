@@ -19,6 +19,7 @@ type PlanRequest struct {
 type PlanOptions struct {
 	DefaultStrategy Strategy
 	CleanupOrphans  bool
+	Roots           []string // optional roots to detect orphan directories
 }
 
 // PlanInput captures desired repositories and optional context (e.g., host
