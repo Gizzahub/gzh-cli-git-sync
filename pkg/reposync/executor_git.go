@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	repo "github.com/gizzahub/gzh-cli-git/pkg/repository"
 )
@@ -146,7 +147,7 @@ func (e GitExecutor) executeOne(ctx context.Context, client repo.Client, logger 
 			sink.OnComplete(res)
 			return res, err
 		}
-		return e.runCloneOrUpdate(ctx, client, logger, action, sink)
+		return e.runCloneOrUpdate(ctx, client, logger, action, opts, sink)
 	case ActionDelete:
 		if action.Repo.TargetPath == "" {
 			err := errors.New("missing target path for delete")
@@ -176,7 +177,7 @@ func (e GitExecutor) executeOne(ctx context.Context, client repo.Client, logger 
 	}
 }
 
-func (e GitExecutor) runCloneOrUpdate(ctx context.Context, client repo.Client, logger repo.Logger, action Action, sink ProgressSink) (ActionResult, error) {
+func (e GitExecutor) runCloneOrUpdate(ctx context.Context, client repo.Client, logger repo.Logger, action Action, runOpts RunOptions, sink ProgressSink) (ActionResult, error) {
 	updateStrategy := toUpdateStrategy(action)
 
 	progress := &progressAdapter{
@@ -184,7 +185,7 @@ func (e GitExecutor) runCloneOrUpdate(ctx context.Context, client repo.Client, l
 		action: action,
 	}
 
-	opts := repo.CloneOrUpdateOptions{
+	cloneOpts := repo.CloneOrUpdateOptions{
 		URL:         action.Repo.CloneURL,
 		Destination: action.Repo.TargetPath,
 		Strategy:    updateStrategy,
@@ -192,11 +193,36 @@ func (e GitExecutor) runCloneOrUpdate(ctx context.Context, client repo.Client, l
 		Progress:    progress,
 	}
 
-	result, err := client.CloneOrUpdate(ctx, opts)
+	var result *repo.CloneOrUpdateResult
+	var err error
+
+	attempts := runOpts.MaxRetries + 1
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	for i := 0; i < attempts; i++ {
+		if ctx.Err() != nil {
+			err = ctx.Err()
+			break
+		}
+
+		result, err = client.CloneOrUpdate(ctx, cloneOpts)
+		if err == nil {
+			break
+		}
+
+		if i < attempts-1 {
+			delay := time.Duration(i+1) * 300 * time.Millisecond
+			sink.OnProgress(action, fmt.Sprintf("retrying (%d/%d): %v", i+1, attempts-1, err), 0)
+			time.Sleep(delay)
+		}
+	}
+
 	if err != nil {
 		res := ActionResult{
 			Action:  action,
-			Message: "clone/update failed",
+			Message: fmt.Sprintf("clone/update failed after %d attempt(s)", attempts),
 			Error:   err,
 		}
 		sink.OnComplete(res)
