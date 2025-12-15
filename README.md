@@ -16,3 +16,24 @@ Repository synchronization engine for gzh ecosystem.
 - `progress`: surface events for CLI/metrics/UX.
 
 This module purposely does **not** bundle the entire `synclone` implementation from `gzh-cli`; instead it rethinks the orchestration layer to be reusable outside the main CLI.
+
+## CLI (shared)
+
+The `pkg/reposynccli` package provides a Cobra command tree that can be used as:
+
+- Standalone binary: `gz-reposync run --config reposync.yaml`
+- Embedded: attach `CommandFactory.NewRootCmd()` as a subcommand under `gz`.
+
+### Minimal config example
+
+```yaml
+strategy: reset          # default strategy (reset|pull|fetch)
+parallel: 4
+maxRetries: 1
+dryRun: true
+repositories:
+  - name: example
+    provider: github
+    url: https://github.com/org/example.git
+    targetPath: ./repos/example
+```

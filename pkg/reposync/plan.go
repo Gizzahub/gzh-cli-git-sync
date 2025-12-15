@@ -2,11 +2,23 @@ package reposync
 
 import "context"
 
-// Planner produces a Plan from desired repositories and current state.
+// Planner produces a Plan from desired repositories and options.
 // Concrete implementation will live in future steps; this placeholder defines
 // the interface surface for consumers and CLI wiring.
 type Planner interface {
-	Plan(ctx context.Context, input PlanInput) (Plan, error)
+	Plan(ctx context.Context, req PlanRequest) (Plan, error)
+}
+
+// PlanRequest combines the desired repositories with planning-time options.
+type PlanRequest struct {
+	Input   PlanInput
+	Options PlanOptions
+}
+
+// PlanOptions influence how a plan is produced (defaults, cleanup policies).
+type PlanOptions struct {
+	DefaultStrategy Strategy
+	CleanupOrphans  bool
 }
 
 // PlanInput captures desired repositories and optional context (e.g., host
@@ -24,17 +36,21 @@ type Plan struct {
 
 // RepoSpec describes a repository to manage.
 type RepoSpec struct {
-	Name       string
-	Provider   string
-	CloneURL   string
-	TargetPath string
+	Name          string
+	Provider      string
+	CloneURL      string
+	TargetPath    string
+	Strategy      Strategy
+	AssumePresent bool // if true, planner treats repo as already present
 }
 
 // Action describes a single operation in a plan.
 type Action struct {
-	Repo   RepoSpec
-	Type   ActionType
-	Reason string
+	Repo      RepoSpec
+	Type      ActionType
+	Strategy  Strategy
+	Reason    string
+	PlannedBy string
 }
 
 // ActionType enumerates planned operations.

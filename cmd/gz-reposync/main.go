@@ -4,27 +4,26 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
+	"github.com/Gizzahub/gzh-cli-reposync/pkg/reposync"
+	"github.com/Gizzahub/gzh-cli-reposync/pkg/reposynccli"
 )
 
 func main() {
-	root := newRootCmd()
+	planner := reposync.StaticPlanner{}
+	executor := reposync.NoopExecutor{}
+	state := reposync.NewInMemoryStateStore()
+	orchestrator := reposync.NewOrchestrator(planner, executor, state)
+
+	factory := reposynccli.CommandFactory{
+		Use:          "gz-reposync",
+		Short:        "Repository synchronization",
+		Orchestrator: orchestrator,
+		SpecLoader:   reposynccli.FileSpecLoader{},
+	}
+
+	root := factory.NewRootCmd()
 	if err := root.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
-}
-
-func newRootCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:           "gz-reposync",
-		Short:         "Repository synchronization CLI (work in progress)",
-		SilenceUsage:  true,
-		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
-	}
-
-	return cmd
 }

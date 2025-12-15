@@ -29,3 +29,26 @@ const (
 	RunStatusDone    RunStatus = "done"
 	RunStatusFailed  RunStatus = "failed"
 )
+
+// InMemoryStateStore is a lightweight StateStore useful for dry-runs and tests.
+type InMemoryStateStore struct {
+	state RunState
+}
+
+// NewInMemoryStateStore creates a new in-memory state store.
+func NewInMemoryStateStore() *InMemoryStateStore {
+	return &InMemoryStateStore{
+		state: RunState{},
+	}
+}
+
+// Save stores state in memory.
+func (s *InMemoryStateStore) Save(_ context.Context, state RunState) error {
+	s.state = state
+	return nil
+}
+
+// Load returns state in memory.
+func (s *InMemoryStateStore) Load(_ context.Context) (RunState, error) {
+	return s.state, nil
+}
