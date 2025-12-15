@@ -53,6 +53,23 @@ func (o *Orchestrator) Run(ctx context.Context, req RunRequest) (ExecutionResult
 		return ExecutionResult{}, ErrMissingDependency
 	}
 
+	stateStore := req.State
+	if stateStore == nil {
+		stateStore = o.StateStore
+	}
+	if stateStore == nil {
+		stateStore = NewInMemoryStateStore()
+	}
+
+	var previousState RunState
+	if req.RunOptions.Resume {
+		prev, err := stateStore.Load(ctx)
+		if err != nil {
+			return ExecutionResult{}, fmt.Errorf("load state: %w", err)
+		}
+		previousState = prev
+	}
+
 	planReq := req.PlanRequest
 	if planReq.Options.DefaultStrategy == "" {
 		planReq.Options.DefaultStrategy = StrategyReset
@@ -63,19 +80,39 @@ func (o *Orchestrator) Run(ctx context.Context, req RunRequest) (ExecutionResult
 		return ExecutionResult{}, fmt.Errorf("plan: %w", err)
 	}
 
+	if req.RunOptions.Resume && len(previousState.Items) > 0 {
+		plan = filterCompleted(plan, previousState)
+	}
+
 	progress := req.Progress
 	if progress == nil {
 		progress = NoopProgressSink{}
 	}
 
-	state := req.State
-	if state == nil {
-		state = o.StateStore
+	return o.Executor.Execute(ctx, plan, req.RunOptions, progress, stateStore)
+}
+
+func filterCompleted(plan Plan, previous RunState) Plan {
+	if len(previous.Items) == 0 {
+		return plan
 	}
 
-	if state == nil {
-		state = NewInMemoryStateStore()
+	done := make(map[string]RunStatus, len(previous.Items))
+	for _, item := range previous.Items {
+		done[item.Repo.TargetPath] = item.Status
 	}
 
-	return o.Executor.Execute(ctx, plan, req.RunOptions, progress, state)
+	var remaining []Action
+	for _, action := range plan.Actions {
+		status, ok := done[action.Repo.TargetPath]
+		if !ok {
+			remaining = append(remaining, action)
+			continue
+		}
+		if status != RunStatusDone {
+			remaining = append(remaining, action)
+		}
+	}
+
+	return Plan{Actions: remaining}
 }
