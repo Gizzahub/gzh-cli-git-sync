@@ -1,0 +1,47 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/gz-reposync
+
+# Test binary, built with `go test -c`
+*.test
+
+# Coverage
+*.out
+coverage.*
+
+# Dependency directories
+vendor/
+
+# Go workspace
+go.work
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Editors/OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+bin/
+tmp/
+*.log
+
+# Temporary
+*.bak
+*.orig
+*_OLD
+*_BACKUP
