@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/Gizzahub/gzh-cli-reposync/pkg/reposync"
+	"github.com/Gizzahub/gzh-cli-git-sync/pkg/reposync"
 )
 
 // ConfigData contains plan + run inputs loaded from a config file.

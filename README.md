@@ -1,11 +1,11 @@
-# gzh-cli-reposync
+# gzh-cli-git-sync
 
-Repository synchronization engine for gzh ecosystem.
+Repository synchronization engine for the gzh ecosystem.
 
 ## Goals
 
 - Library-first: plan/execute/state/progress APIs to manage many repositories.
-- Shared CLI: usable both as standalone `gz-reposync` and embedded as `gz reposync`.
+- Shared CLI: usable both as standalone `gz-git-sync` and embedded as `gz git-sync`.
 - Provider-agnostic: takes repo specs from callers (e.g., gitforge) instead of assuming one hosting service.
 
 ## High-level pieces
@@ -21,8 +21,8 @@ This module purposely does **not** bundle the entire `synclone` implementation f
 
 The `pkg/reposynccli` package provides a Cobra command tree that can be used as:
 
-- Standalone binary: `gz-reposync run --config reposync.yaml`
-- Embedded: attach `CommandFactory.NewRootCmd()` as a subcommand under `gz`.
+- Standalone binary: `gz-git-sync run --config git-sync.yaml`
+- Embedded: attach `CommandFactory.NewRootCmd()` as a subcommand under `gz` (e.g., `gz git-sync`).
 
 ### Minimal config example
 

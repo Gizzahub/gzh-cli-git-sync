@@ -1,4 +1,4 @@
-module github.com/Gizzahub/gzh-cli-reposync
+module github.com/Gizzahub/gzh-cli-git-sync
 
 go 1.25.1
 

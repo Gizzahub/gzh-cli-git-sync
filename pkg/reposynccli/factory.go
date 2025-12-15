@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Gizzahub/gzh-cli-reposync/pkg/reposync"
+	"github.com/Gizzahub/gzh-cli-git-sync/pkg/reposync"
 )
 
 // CommandFactory builds a Cobra command tree that can be embedded into other CLIs.
@@ -25,12 +25,12 @@ type CommandFactory struct {
 func (f CommandFactory) NewRootCmd() *cobra.Command {
 	use := f.Use
 	if use == "" {
-		use = "reposync"
+		use = "git-sync"
 	}
 
 	short := f.Short
 	if short == "" {
-		short = "Repository synchronization"
+		short = "Git repository synchronization"
 	}
 
 	root := &cobra.Command{

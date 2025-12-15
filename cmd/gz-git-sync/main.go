@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Gizzahub/gzh-cli-reposync/pkg/reposync"
-	"github.com/Gizzahub/gzh-cli-reposync/pkg/reposynccli"
+	"github.com/Gizzahub/gzh-cli-git-sync/pkg/reposync"
+	"github.com/Gizzahub/gzh-cli-git-sync/pkg/reposynccli"
 )
 
 func main() {
@@ -15,8 +15,8 @@ func main() {
 	orchestrator := reposync.NewOrchestrator(planner, executor, state)
 
 	factory := reposynccli.CommandFactory{
-		Use:          "gz-reposync",
-		Short:        "Repository synchronization",
+		Use:          "gz-git-sync",
+		Short:        "Git repository synchronization",
 		Orchestrator: orchestrator,
 		SpecLoader:   reposynccli.FileSpecLoader{},
 	}

@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Gizzahub/gzh-cli-reposync/pkg/reposync"
+	"github.com/Gizzahub/gzh-cli-git-sync/pkg/reposync"
 )
 
 func (f CommandFactory) newRunCmd() *cobra.Command {
@@ -78,7 +78,7 @@ func (f CommandFactory) newRunCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to reposync config file")
+	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to git-sync config file")
 	_ = cmd.MarkFlagRequired("config")
 	cmd.Flags().StringVar(&strategy, "strategy", "", "Default strategy override (reset|pull|fetch)")
 	cmd.Flags().IntVar(&parallel, "parallel", 0, "Parallel workers (overrides config)")

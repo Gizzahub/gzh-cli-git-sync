@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/Gizzahub/gzh-cli-reposync/pkg/reposync"
+	"github.com/Gizzahub/gzh-cli-git-sync/pkg/reposync"
 )
 
 // ConsoleProgressSink prints a simple textual progress log.
