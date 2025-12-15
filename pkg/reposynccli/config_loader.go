@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -37,6 +39,7 @@ type fileConfig struct {
 	Resume         bool        `yaml:"resume"`
 	DryRun         bool        `yaml:"dryRun"`
 	CleanupOrphans bool        `yaml:"cleanupOrphans"`
+	Roots          []string    `yaml:"roots"`
 	Repositories   []repoEntry `yaml:"repositories"`
 }
 
@@ -92,6 +95,10 @@ func (l FileSpecLoader) Load(_ context.Context, path string) (ConfigData, error)
 		parsedStrategy = defaultStrategy
 	}
 
+	if len(cfg.Repositories) == 0 {
+		return ConfigData{}, errors.New("config has no repositories")
+	}
+
 	plan := reposync.PlanRequest{
 		Input: reposync.PlanInput{
 			Repos: make([]reposync.RepoSpec, 0, len(cfg.Repositories)),
@@ -99,8 +106,11 @@ func (l FileSpecLoader) Load(_ context.Context, path string) (ConfigData, error)
 		Options: reposync.PlanOptions{
 			DefaultStrategy: parsedStrategy,
 			CleanupOrphans:  cfg.CleanupOrphans,
+			Roots:           cleanRoots(cfg.Roots),
 		},
 	}
+
+	seenTargets := make(map[string]struct{}, len(cfg.Repositories))
 
 	for _, repo := range cfg.Repositories {
 		if repo.Name == "" || repo.URL == "" || repo.TargetPath == "" {
@@ -115,11 +125,17 @@ func (l FileSpecLoader) Load(_ context.Context, path string) (ConfigData, error)
 			}
 		}
 
+		targetPath := cleanPath(repo.TargetPath)
+		if _, exists := seenTargets[targetPath]; exists {
+			return ConfigData{}, fmt.Errorf("duplicate targetPath detected: %s", targetPath)
+		}
+		seenTargets[targetPath] = struct{}{}
+
 		plan.Input.Repos = append(plan.Input.Repos, reposync.RepoSpec{
 			Name:          repo.Name,
 			Provider:      repo.Provider,
 			CloneURL:      repo.URL,
-			TargetPath:    repo.TargetPath,
+			TargetPath:    targetPath,
 			Strategy:      repoStrategy,
 			AssumePresent: repo.AssumePresent,
 		})
@@ -143,4 +159,28 @@ func (l FileSpecLoader) Load(_ context.Context, path string) (ConfigData, error)
 		Plan: plan,
 		Run:  run,
 	}, nil
+}
+
+func cleanPath(path string) string {
+	if path == "" {
+		return path
+	}
+	expanded := os.ExpandEnv(path)
+	if strings.HasPrefix(expanded, "~") {
+		if home, err := os.UserHomeDir(); err == nil {
+			expanded = filepath.Join(home, strings.TrimPrefix(expanded, "~"))
+		}
+	}
+	return filepath.Clean(expanded)
+}
+
+func cleanRoots(roots []string) []string {
+	out := make([]string, 0, len(roots))
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
+		out = append(out, cleanPath(root))
+	}
+	return out
 }
