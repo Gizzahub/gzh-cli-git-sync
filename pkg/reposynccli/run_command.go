@@ -16,6 +16,7 @@ func (f CommandFactory) newRunCmd() *cobra.Command {
 		maxRetries int
 		resume     bool
 		dryRun     bool
+		stateFile  string
 	)
 
 	cmd := &cobra.Command{
@@ -57,6 +58,9 @@ func (f CommandFactory) newRunCmd() *cobra.Command {
 			if cmd.Flags().Changed("dry-run") {
 				runOpts.DryRun = dryRun
 			}
+			if runOpts.Resume && stateFile == "" {
+				return fmt.Errorf("resume requested but no --state-file provided")
+			}
 
 			progress := ConsoleProgressSink{Out: cmd.OutOrStdout()}
 
@@ -65,10 +69,16 @@ func (f CommandFactory) newRunCmd() *cobra.Command {
 				return err
 			}
 
+			var state reposync.StateStore
+			if stateFile != "" {
+				state = reposync.NewFileStateStore(stateFile)
+			}
+
 			_, err = orch.Run(ctx, reposync.RunRequest{
 				PlanRequest: planReq,
 				RunOptions:  runOpts,
 				Progress:    progress,
+				State:       state,
 			})
 			if err != nil {
 				return fmt.Errorf("run: %w", err)
@@ -85,6 +95,7 @@ func (f CommandFactory) newRunCmd() *cobra.Command {
 	cmd.Flags().IntVar(&maxRetries, "max-retries", 0, "Retry attempts per repo (overrides config)")
 	cmd.Flags().BoolVar(&resume, "resume", false, "Resume from previous state (overrides config)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Dry-run without touching git (overrides config)")
+	cmd.Flags().StringVar(&stateFile, "state-file", "", "Path to persist and load run state for resume")
 
 	return cmd
 }

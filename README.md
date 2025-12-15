@@ -19,6 +19,7 @@ This module purposely does **not** bundle the entire `synclone` implementation f
 
 - Default executor uses [`gzh-cli-git`](https://github.com/Gizzahub/gzh-cli-git) to perform real Git operations.
 - Planner looks at the filesystem to choose clone/update/replace and can mark orphans for deletion when `cleanupOrphans` + `roots` are provided.
+- State persistence is supported via `--state-file` for resume-able runs.
 
 ## CLI (shared)
 
@@ -42,4 +43,7 @@ repositories:
     provider: github
     url: https://github.com/org/example.git
     targetPath: ./repos/example
+
+# resume/run state (optional, CLI)
+# gz-git-sync run --config git-sync.yaml --state-file .cache/git-sync/state.json --resume
 ```
