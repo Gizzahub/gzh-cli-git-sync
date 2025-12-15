@@ -17,6 +17,8 @@ Repository synchronization engine for the gzh ecosystem.
 
 This module purposely does **not** bundle the entire `synclone` implementation from `gzh-cli`; instead it rethinks the orchestration layer to be reusable outside the main CLI.
 
+- Default executor uses [`gzh-cli-git`](https://github.com/Gizzahub/gzh-cli-git) to perform real Git operations.
+
 ## CLI (shared)
 
 The `pkg/reposynccli` package provides a Cobra command tree that can be used as:

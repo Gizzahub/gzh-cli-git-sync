@@ -10,7 +10,7 @@ import (
 
 func main() {
 	planner := reposync.StaticPlanner{}
-	executor := reposync.NoopExecutor{}
+	executor := reposync.GitExecutor{}
 	state := reposync.NewInMemoryStateStore()
 	orchestrator := reposync.NewOrchestrator(planner, executor, state)
 
