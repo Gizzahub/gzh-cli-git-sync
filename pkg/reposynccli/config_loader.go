@@ -35,7 +35,7 @@ type FileSpecLoader struct {
 type fileConfig struct {
 	Strategy       string      `yaml:"strategy"`
 	Parallel       int         `yaml:"parallel"`
-	MaxRetries     int         `yaml:"maxRetries"`
+	MaxRetries     *int        `yaml:"maxRetries"`
 	Resume         bool        `yaml:"resume"`
 	DryRun         bool        `yaml:"dryRun"`
 	CleanupOrphans bool        `yaml:"cleanupOrphans"`
@@ -52,15 +52,36 @@ type repoEntry struct {
 	AssumePresent bool   `yaml:"assumePresent"`
 }
 
+type gzhYamlConfig struct {
+	Provider     string        `yaml:"provider"`
+	SyncMode     gzhYamlMode   `yaml:"sync_mode"`
+	Repositories []gzhYamlRepo `yaml:"repositories"`
+}
+
+type gzhYamlMode struct {
+	CleanupOrphans bool `yaml:"cleanup_orphans"`
+}
+
+type gzhYamlRepo struct {
+	Name     string `yaml:"name"`
+	CloneURL string `yaml:"clone_url"`
+}
+
 // Load implements SpecLoader.
 func (l FileSpecLoader) Load(_ context.Context, path string) (ConfigData, error) {
 	if path == "" {
 		return ConfigData{}, errors.New("config path is required")
 	}
 
-	raw, err := os.ReadFile(path)
+	configPath := cleanPath(path)
+
+	raw, err := os.ReadFile(configPath)
 	if err != nil {
 		return ConfigData{}, fmt.Errorf("read config: %w", err)
+	}
+
+	if isGzhYaml(raw) {
+		return l.loadGzhYaml(raw, configPath)
 	}
 
 	var cfg fileConfig
@@ -70,6 +91,10 @@ func (l FileSpecLoader) Load(_ context.Context, path string) (ConfigData, error)
 
 	if len(cfg.Repositories) == 0 {
 		return ConfigData{}, errors.New("config has no repositories")
+	}
+
+	if cfg.CleanupOrphans && len(cfg.Roots) == 0 {
+		return ConfigData{}, errors.New("cleanupOrphans enabled but no roots provided")
 	}
 
 	defaultStrategy := l.DefaultStrategy
@@ -83,7 +108,7 @@ func (l FileSpecLoader) Load(_ context.Context, path string) (ConfigData, error)
 	}
 
 	defaultRetries := l.DefaultRetries
-	if defaultRetries < 0 {
+	if defaultRetries <= 0 {
 		defaultRetries = 1
 	}
 
@@ -93,10 +118,6 @@ func (l FileSpecLoader) Load(_ context.Context, path string) (ConfigData, error)
 	}
 	if cfg.Strategy == "" {
 		parsedStrategy = defaultStrategy
-	}
-
-	if len(cfg.Repositories) == 0 {
-		return ConfigData{}, errors.New("config has no repositories")
 	}
 
 	plan := reposync.PlanRequest{
@@ -143,16 +164,120 @@ func (l FileSpecLoader) Load(_ context.Context, path string) (ConfigData, error)
 
 	run := reposync.RunOptions{
 		Parallel:   cfg.Parallel,
-		MaxRetries: cfg.MaxRetries,
+		MaxRetries: defaultRetries,
 		Resume:     cfg.Resume,
 		DryRun:     cfg.DryRun,
+	}
+	if cfg.MaxRetries != nil {
+		run.MaxRetries = *cfg.MaxRetries
 	}
 
 	if run.Parallel <= 0 {
 		run.Parallel = defaultParallel
 	}
 	if run.MaxRetries < 0 {
-		run.MaxRetries = defaultRetries
+		return ConfigData{}, fmt.Errorf("maxRetries must be >= 0 (got %d)", run.MaxRetries)
+	}
+
+	return ConfigData{
+		Plan: plan,
+		Run:  run,
+	}, nil
+}
+
+func isGzhYaml(raw []byte) bool {
+	var root map[string]any
+	if err := yaml.Unmarshal(raw, &root); err != nil {
+		return false
+	}
+
+	if _, ok := root["sync_mode"]; ok {
+		return true
+	}
+	if _, ok := root["organization"]; ok {
+		return true
+	}
+	if _, ok := root["generated_at"]; ok {
+		return true
+	}
+
+	repos, ok := root["repositories"].([]any)
+	if !ok {
+		return false
+	}
+	for _, entry := range repos {
+		m, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, ok := m["clone_url"]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (l FileSpecLoader) loadGzhYaml(raw []byte, path string) (ConfigData, error) {
+	var cfg gzhYamlConfig
+	if err := yaml.Unmarshal(raw, &cfg); err != nil {
+		return ConfigData{}, fmt.Errorf("parse gzh.yaml: %w", err)
+	}
+	if len(cfg.Repositories) == 0 {
+		return ConfigData{}, errors.New("gzh.yaml has no repositories")
+	}
+
+	defaultStrategy := l.DefaultStrategy
+	if defaultStrategy == "" {
+		defaultStrategy = reposync.StrategyReset
+	}
+
+	defaultParallel := l.DefaultParallel
+	if defaultParallel <= 0 {
+		defaultParallel = 4
+	}
+
+	defaultRetries := l.DefaultRetries
+	if defaultRetries <= 0 {
+		defaultRetries = 1
+	}
+
+	root := cleanPath(filepath.Dir(path))
+
+	plan := reposync.PlanRequest{
+		Input: reposync.PlanInput{
+			Repos: make([]reposync.RepoSpec, 0, len(cfg.Repositories)),
+		},
+		Options: reposync.PlanOptions{
+			DefaultStrategy: defaultStrategy,
+			CleanupOrphans:  cfg.SyncMode.CleanupOrphans,
+			Roots:           []string{root},
+		},
+	}
+
+	seenTargets := make(map[string]struct{}, len(cfg.Repositories))
+	for _, repo := range cfg.Repositories {
+		if repo.Name == "" || repo.CloneURL == "" {
+			return ConfigData{}, errors.New("gzh.yaml repository entry is missing required fields (name/clone_url)")
+		}
+
+		targetPath := cleanPath(filepath.Join(root, repo.Name))
+		if _, exists := seenTargets[targetPath]; exists {
+			return ConfigData{}, fmt.Errorf("duplicate targetPath detected: %s", targetPath)
+		}
+		seenTargets[targetPath] = struct{}{}
+
+		plan.Input.Repos = append(plan.Input.Repos, reposync.RepoSpec{
+			Name:       repo.Name,
+			Provider:   cfg.Provider,
+			CloneURL:   repo.CloneURL,
+			TargetPath: targetPath,
+			Strategy:   defaultStrategy,
+		})
+	}
+
+	run := reposync.RunOptions{
+		Parallel:   defaultParallel,
+		MaxRetries: defaultRetries,
 	}
 
 	return ConfigData{
@@ -166,9 +291,11 @@ func cleanPath(path string) string {
 		return path
 	}
 	expanded := os.ExpandEnv(path)
-	if strings.HasPrefix(expanded, "~") {
+	if expanded == "~" || strings.HasPrefix(expanded, "~/") || strings.HasPrefix(expanded, "~\\") {
 		if home, err := os.UserHomeDir(); err == nil {
-			expanded = filepath.Join(home, strings.TrimPrefix(expanded, "~"))
+			rest := strings.TrimPrefix(expanded[1:], "/")
+			rest = strings.TrimPrefix(rest, "\\")
+			expanded = filepath.Join(home, rest)
 		}
 	}
 	return filepath.Clean(expanded)

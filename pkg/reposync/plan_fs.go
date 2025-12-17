@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // FSPlanner inspects the filesystem to decide clone/update/delete actions.
@@ -103,6 +104,7 @@ func planForRepo(repo RepoSpec) Action {
 
 func findOrphans(ctx context.Context, roots []string, desired map[string]RepoSpec) []Action {
 	var actions []Action
+	protected := buildProtectedDirs(desired)
 
 	for _, root := range roots {
 		select {
@@ -120,14 +122,21 @@ func findOrphans(ctx context.Context, roots []string, desired map[string]RepoSpe
 			if !entry.IsDir() {
 				continue
 			}
-			path := filepath.Clean(filepath.Join(root, entry.Name()))
+			name := entry.Name()
+			if name == ".git" || strings.HasPrefix(name, ".") {
+				continue
+			}
+			path := filepath.Clean(filepath.Join(root, name))
 			if _, ok := desired[path]; ok {
+				continue
+			}
+			if _, ok := protected[path]; ok {
 				continue
 			}
 
 			actions = append(actions, Action{
 				Repo: RepoSpec{
-					Name:       entry.Name(),
+					Name:       name,
 					TargetPath: path,
 				},
 				Type:      ActionDelete,
@@ -138,6 +147,25 @@ func findOrphans(ctx context.Context, roots []string, desired map[string]RepoSpe
 	}
 
 	return actions
+}
+
+func buildProtectedDirs(desired map[string]RepoSpec) map[string]struct{} {
+	protected := make(map[string]struct{}, len(desired))
+
+	for targetPath := range desired {
+		dir := filepath.Clean(filepath.Dir(targetPath))
+		for dir != "." && dir != string(filepath.Separator) && dir != targetPath {
+			protected[dir] = struct{}{}
+
+			parent := filepath.Clean(filepath.Dir(dir))
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+
+	return protected
 }
 
 func isGitRepo(path string) bool {

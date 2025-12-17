@@ -18,7 +18,7 @@ Repository synchronization engine for the gzh ecosystem.
 This module purposely does **not** bundle the entire `synclone` implementation from `gzh-cli`; instead it rethinks the orchestration layer to be reusable outside the main CLI.
 
 - Default executor uses [`gzh-cli-git`](https://github.com/Gizzahub/gzh-cli-git) to perform real Git operations.
-- Planner looks at the filesystem to choose clone/update/replace and can mark orphans for deletion when `cleanupOrphans` + `roots` are provided.
+- Planner looks at the filesystem to choose clone/update/replace and can mark orphans for deletion when `cleanupOrphans` + `roots` are provided (dot-directories like `.git` are ignored; parent dirs of nested targets are preserved).
 - State persistence is supported via `--state-file` for resume-able runs (required when using `--resume`).
 
 ## CLI (shared)

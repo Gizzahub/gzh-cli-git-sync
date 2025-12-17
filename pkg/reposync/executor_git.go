@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -147,6 +148,15 @@ func (e GitExecutor) executeOne(ctx context.Context, client repo.Client, logger 
 			sink.OnComplete(res)
 			return res, err
 		}
+		if err := ensureParentDir(action.Repo.TargetPath); err != nil {
+			res := ActionResult{
+				Action:  action,
+				Message: "failed to prepare target directory",
+				Error:   err,
+			}
+			sink.OnComplete(res)
+			return res, err
+		}
 		return e.runCloneOrUpdate(ctx, client, logger, action, opts, sink)
 	case ActionDelete:
 		if action.Repo.TargetPath == "" {
@@ -175,6 +185,14 @@ func (e GitExecutor) executeOne(ctx context.Context, client repo.Client, logger 
 		sink.OnComplete(res)
 		return res, err
 	}
+}
+
+func ensureParentDir(targetPath string) error {
+	dir := filepath.Dir(targetPath)
+	if dir == "." || dir == "" {
+		return nil
+	}
+	return os.MkdirAll(dir, 0o755)
 }
 
 func (e GitExecutor) runCloneOrUpdate(ctx context.Context, client repo.Client, logger repo.Logger, action Action, runOpts RunOptions, sink ProgressSink) (ActionResult, error) {
