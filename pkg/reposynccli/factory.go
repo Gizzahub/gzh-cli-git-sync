@@ -41,6 +41,7 @@ func (f CommandFactory) NewRootCmd() *cobra.Command {
 	}
 
 	root.AddCommand(f.newRunCmd())
+	root.AddCommand(f.newForgeCmd())
 	root.AddCommand(f.newVersionCmd())
 
 	return root
